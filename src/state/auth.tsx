@@ -11,6 +11,8 @@ type AuthState = {
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string) => Promise<{ error: string | null; needsConfirmation: boolean }>;
   signOut: () => Promise<void>;
+  /** Drops the session on this device only, for when the account no longer exists on the server. */
+  forgetSession: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -48,9 +50,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }, []);
 
+  const forgetSession = useCallback(async () => {
+    await supabase.auth.signOut({ scope: 'local' });
+  }, []);
+
   const value = useMemo(
-    () => ({ session, loading, signIn, signUp, signOut }),
-    [session, loading, signIn, signUp, signOut],
+    () => ({ session, loading, signIn, signUp, signOut, forgetSession }),
+    [session, loading, signIn, signUp, signOut, forgetSession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

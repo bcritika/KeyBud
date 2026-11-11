@@ -1,8 +1,9 @@
 import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { FunFont, Palette, Spacing } from '@/constants/theme';
+import { Chunky, FunFont, Palette, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useTouchTarget } from '@/hooks/use-touch-target';
 
 type ButtonProps = {
   label: string;
@@ -12,15 +13,15 @@ type ButtonProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-const VARIANTS = {
-  primary: { background: Palette.primary, edge: Palette.primaryDark },
-  danger: { background: Palette.danger, edge: Palette.dangerDark },
-} as const;
-
+/** A chunky key-style button: violet for the main action, white for secondary, coral for danger. */
 export function Button({ label, onPress, variant = 'primary', disabled, style }: ButtonProps) {
   const theme = useTheme();
-  const { background, edge } =
-    variant === 'secondary' ? { background: theme.backgroundSelected, edge: theme.backgroundSelected } : VARIANTS[variant];
+  const touchTarget = useTouchTarget();
+  const { background, text } = {
+    primary: { background: Palette.primary, text: Palette.onPrimary },
+    secondary: { background: theme.backgroundElement, text: theme.text },
+    danger: { background: Palette.danger, text: Palette.onAccent },
+  }[variant];
 
   return (
     <Pressable
@@ -30,35 +31,28 @@ export function Button({ label, onPress, variant = 'primary', disabled, style }:
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: background, borderBottomColor: edge, borderBottomWidth: pressed ? 2 : 5 },
-        pressed && styles.pressed,
+        Chunky.key,
+        { backgroundColor: background, minHeight: Math.max(56, touchTarget) },
+        pressed && Chunky.pressed,
         disabled && styles.disabled,
         style,
       ]}>
-      <ThemedText
-        type="default"
-        style={[styles.label, variant !== 'secondary' && { color: Palette.onPrimary }]}>
-        {label}
-      </ThemedText>
+      <ThemedText style={[styles.label, { color: text }]}>{label}</ThemedText>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 56,
-    borderRadius: Spacing.three,
     paddingHorizontal: Spacing.four,
     alignItems: 'center',
     justifyContent: 'center',
   },
   label: {
-    fontFamily: FunFont.semiBold,
-    // Cancels ThemedText's own numeric fontWeight: mixing that with a specific, single-weight
-    // custom font file makes some platforms fake a different weight or silently drop the font.
+    fontFamily: FunFont.extraBold,
     fontWeight: 'normal',
-    fontSize: 18,
+    fontSize: 20,
+    lineHeight: 28,
   },
-  pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.4 },
+  disabled: { opacity: 0.4, boxShadow: 'none' },
 });

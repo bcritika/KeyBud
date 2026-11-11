@@ -46,7 +46,7 @@ function rowToItem(row: ItemRow): BoardItem {
     isCustom: true,
     image: row.photo_file
       ? { kind: 'photo', file: row.photo_file }
-      : { kind: 'emoji', value: row.emoji ?? '' },
+      : { kind: 'symbol', key: row.emoji ?? '' },
   };
 }
 
@@ -101,7 +101,8 @@ export async function runSync(userId: string, snapshot: PersistedState): Promise
       id: item.id,
       user_id: userId,
       word: item.word,
-      emoji: item.image.kind === 'emoji' ? item.image.value : null,
+      // The column is still named for the emojis it used to hold; it now holds a symbol key.
+      emoji: item.image.kind === 'symbol' ? item.image.key : null,
       photo_file: item.image.kind === 'photo' ? item.image.file : null,
     });
     throwIfError(error);
@@ -160,4 +161,28 @@ export async function downloadMissingPhotos(userId: string, items: BoardItem[]):
     }
   }
   return downloaded;
+}
+
+/** How many stored photos to list (and delete) at a time when deleting an account. */
+const DELETE_PAGE_SIZE = 100;
+
+/**
+ * Permanently deletes the signed-in user's account and everything stored with it. Photos go
+ * first, since the database function can't delete stored files; then delete_my_account (see
+ * supabase/migrations) removes the account, which also deletes its settings and items.
+ */
+export async function deleteRemoteAccount(userId: string) {
+  // Each pass deletes what it listed, so the next listing starts over from the top.
+  for (;;) {
+    const { data, error } = await supabase.storage.from(PHOTO_BUCKET).list(userId, { limit: DELETE_PAGE_SIZE });
+    throwIfError(error);
+    if (!data?.length) break;
+    const removed = await supabase.storage.from(PHOTO_BUCKET).remove(data.map((file) => photoPath(userId, file.name)));
+    throwIfError(removed.error);
+    // Storage reports a refused delete as an empty result, not an error; stop rather than loop.
+    if (!removed.data?.length) throw new Error('Could not delete stored photos.');
+  }
+
+  const { error } = await supabase.rpc('delete_my_account');
+  throwIfError(error);
 }

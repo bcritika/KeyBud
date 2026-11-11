@@ -3,10 +3,10 @@ import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
-import { TextField } from '@/components/text-field';
+import { FieldMessage, TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { FunFont, MaxContentWidth, Palette, Spacing } from '@/constants/theme';
+import { Chunky, MaxContentWidth, Palette, Spacing } from '@/constants/theme';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { isValidEmail } from '@/lib/validation';
 import { useAuth } from '@/state/auth';
@@ -56,7 +56,7 @@ export default function SignInScreen() {
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets>
           <ThemedText type="title" style={styles.title}>
-            🔤 KeyBud
+            KeyBud
           </ThemedText>
           <ThemedText themeColor="textSecondary">
             {isSignUp
@@ -65,7 +65,7 @@ export default function SignInScreen() {
           </ThemedText>
 
           {!isSupabaseConfigured ? (
-            <ThemedView type="backgroundElement" style={styles.setupCard}>
+            <ThemedView type="backgroundElement" style={[styles.setupCard, Chunky.key]}>
               <ThemedText type="smallBold">Supabase isn&apos;t set up yet</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
                 Copy .env.example to .env.local, add your project URL and anon key, then restart the
@@ -93,16 +93,8 @@ export default function SignInScreen() {
             onSubmitEditing={handleSubmit}
           />
 
-          {error ? (
-            <ThemedText style={{ color: Palette.danger }} accessibilityLiveRegion="polite">
-              {error}
-            </ThemedText>
-          ) : null}
-          {notice ? (
-            <ThemedText style={{ color: Palette.success }} accessibilityLiveRegion="polite">
-              {notice}
-            </ThemedText>
-          ) : null}
+          {error ? <FieldMessage kind="error">{error}</FieldMessage> : null}
+          {notice ? <FieldMessage kind="success">{notice}</FieldMessage> : null}
 
           <Button
             label={busy ? 'One moment...' : isSignUp ? 'Create account' : 'Sign in'}
@@ -138,9 +130,8 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     gap: Spacing.three,
   },
-  title: { fontFamily: FunFont.bold, fontWeight: 'normal' },
+  title: { color: Palette.primary },
   setupCard: {
-    borderRadius: Spacing.three,
     padding: Spacing.three,
     gap: Spacing.one,
   },

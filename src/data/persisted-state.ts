@@ -49,16 +49,35 @@ export const INITIAL_STATE: PersistedState = {
 // whatever a v2 cache would have held, so there's nothing to migrate by hand.
 const cacheKey = (userId: string) => `keybud/state/v3/${userId}`;
 
+/**
+ * Items cached before the switch to pictograms have `{ kind: 'emoji', value }` pictures. They
+ * become symbol pictures holding that emoji, which data/symbols.ts maps to matching clipart.
+ */
+function upgradeEmojiItem(item: BoardItem): BoardItem {
+  const image = item.image as BoardItem['image'] | { kind: 'emoji'; value: string };
+  return image.kind === 'emoji' ? { ...item, image: { kind: 'symbol', key: image.value } } : item;
+}
+
 export async function loadCache(userId: string): Promise<PersistedState> {
   try {
     const raw = await AsyncStorage.getItem(cacheKey(userId));
     if (!raw) return INITIAL_STATE;
     const saved = JSON.parse(raw);
-    return { ...INITIAL_STATE, ...saved, outbox: { ...EMPTY_OUTBOX, ...saved.outbox } };
+    return {
+      ...INITIAL_STATE,
+      ...saved,
+      customItems: (saved.customItems ?? []).map(upgradeEmojiItem),
+      outbox: { ...EMPTY_OUTBOX, ...saved.outbox },
+    };
   } catch {
     // Unreadable cache: start from defaults and let the next sync restore it from the server.
     return INITIAL_STATE;
   }
+}
+
+/** Forgets everything saved on this device for a user, e.g. after their account is deleted. */
+export function clearCache(userId: string) {
+  return AsyncStorage.removeItem(cacheKey(userId)).catch(() => {});
 }
 
 export function saveCache(userId: string, state: PersistedState) {

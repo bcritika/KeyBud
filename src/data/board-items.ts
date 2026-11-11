@@ -1,6 +1,9 @@
-/** A picture on a board item: a built-in emoji, or a photo the user uploaded. */
+import type { SymbolKey } from '@/data/symbols';
+
+/** A picture on a board item: a bundled pictogram, or a photo the user uploaded. */
 export type ItemImage =
-  | { kind: 'emoji'; value: string }
+  /** `key` names a pictogram in data/symbols.ts. Items saved before pictograms may hold an emoji. */
+  | { kind: 'symbol'; key: string }
   /** `file` is a file name inside the app's board-images folder (see lib/images.ts). */
   | { kind: 'photo'; file: string };
 
@@ -12,39 +15,33 @@ export type BoardItem = {
   isCustom?: boolean;
 };
 
-const emojiItem = (word: string, emoji: string): BoardItem => ({
+const symbolItem = (word: string, key: SymbolKey): BoardItem => ({
   id: `default-${word}`,
   word,
-  image: { kind: 'emoji', value: emoji },
+  image: { kind: 'symbol', key },
 });
 
 export const DEFAULT_ITEMS: BoardItem[] = [
-  emojiItem('help', '🆘'),
-  emojiItem('water', '💧'),
-  emojiItem('eat', '🍽️'),
-  emojiItem('drink', '🥤'),
-  emojiItem('more', '➕'),
-  emojiItem('stop', '🛑'),
-  emojiItem('play', '🎮'),
-  emojiItem('home', '🏠'),
-  emojiItem('apple', '🍎'),
-  emojiItem('milk', '🥛'),
-  emojiItem('bread', '🍞'),
-  emojiItem('cat', '🐱'),
-  emojiItem('dog', '🐶'),
-  emojiItem('ball', '⚽'),
-  emojiItem('book', '📖'),
-  emojiItem('bed', '🛏️'),
-  emojiItem('car', '🚗'),
-  emojiItem('sun', '☀️'),
-  emojiItem('hat', '🎩'),
-  emojiItem('cup', '☕'),
-];
-
-/** Pictures offered when someone adds their own item but doesn't upload a photo. */
-export const EMOJI_CHOICES = [
-  '😀', '😢', '😴', '🤒', '🍕', '🍌', '🍪', '🚌', '🎵', '📺',
-  '🧸', '🚿', '🚽', '👕', '👟', '💊', '📱', '🌳', '🐟', '❤️',
+  symbolItem('help', 'help'),
+  symbolItem('water', 'water'),
+  symbolItem('eat', 'eat'),
+  symbolItem('drink', 'drink'),
+  symbolItem('more', 'more'),
+  symbolItem('stop', 'stop'),
+  symbolItem('play', 'play'),
+  symbolItem('home', 'home'),
+  symbolItem('apple', 'apple'),
+  symbolItem('milk', 'milk'),
+  symbolItem('bread', 'bread'),
+  symbolItem('cat', 'cat'),
+  symbolItem('dog', 'dog'),
+  symbolItem('ball', 'ball'),
+  symbolItem('book', 'book'),
+  symbolItem('bed', 'bed'),
+  symbolItem('car', 'car'),
+  symbolItem('sun', 'sun'),
+  symbolItem('hat', 'hat'),
+  symbolItem('cup', 'cup'),
 ];
 
 export const DEFAULT_SELECTED_IDS = DEFAULT_ITEMS.slice(0, 8).map((item) => item.id);

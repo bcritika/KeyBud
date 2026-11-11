@@ -6,7 +6,7 @@ import { Button } from '@/components/button';
 import { ProgressDots } from '@/components/progress-dots';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, FunFont, MaxContentWidth, Palette, Spacing } from '@/constants/theme';
+import { BottomTabInset, Chunky, FunFont, KEY_OUTLINE, MaxContentWidth, Palette, Spacing } from '@/constants/theme';
 import { describeLevel, MAX_LEVEL } from '@/game/levels';
 import { colorForKey } from '@/lib/kid-colors';
 import { useAppState } from '@/state/app-state';
@@ -21,13 +21,13 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView contentContainerStyle={styles.content}>
           <ThemedText type="title" style={styles.title}>
-            🔤 KeyBud
+            KeyBud
           </ThemedText>
           <ThemedText themeColor="textSecondary">
             Learn the keyboard by spelling the words on your communication board.
           </ThemedText>
 
-          <ThemedView type="backgroundElement" style={styles.levelCard}>
+          <ThemedView type="backgroundElement" style={[styles.levelCard, Chunky.key]}>
             <View style={styles.levelCardHeader}>
               <View style={[styles.levelBadge, { backgroundColor: colorForKey(`level-${progress.level}`) }]}>
                 <Text style={styles.levelBadgeNumber}>{progress.level}</Text>
@@ -79,9 +79,8 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.four,
   },
-  title: { fontFamily: FunFont.bold, fontWeight: 'normal' },
+  title: { color: Palette.primary },
   levelCard: {
-    borderRadius: Spacing.four,
     padding: Spacing.four,
     gap: Spacing.two,
   },
@@ -94,10 +93,12 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
+    borderWidth: KEY_OUTLINE,
+    borderColor: Palette.outline,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  levelBadgeNumber: { fontSize: 26, fontFamily: FunFont.bold, color: Palette.onAccent },
+  levelBadgeNumber: { fontSize: 26, lineHeight: 34, fontFamily: FunFont.extraBold, color: Palette.onAccent },
   levelCardHeading: { gap: Spacing.one },
-  levelCardTitle: { fontFamily: FunFont.semiBold, fontWeight: 'normal' },
+  levelCardTitle: { fontFamily: FunFont.semiBold },
 });

@@ -2,26 +2,27 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, type HostInstance } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { DragGhost } from '@/components/drag-ghost';
 import { ItemImage } from '@/components/item-image';
-import { Keyboard } from '@/components/keyboard';
+import { Keyboard, useKeySize } from '@/components/keyboard';
 import { LetterSlots } from '@/components/letter-slots';
 import { ProgressDots } from '@/components/progress-dots';
 import { ThemedText } from '@/components/themed-text';
 import { WrongMark } from '@/components/wrong-mark';
-import { FunFont, MaxContentWidth, Palette, Spacing } from '@/constants/theme';
+import { Chunky, FunFont, MaxContentWidth, Palette, Spacing } from '@/constants/theme';
 import type { BoardItem } from '@/data/board-items';
 import { describeLevel, highlightedLetters, MAX_LEVEL, showsGhostLetters } from '@/game/levels';
 import { PHONETIC_SOUND } from '@/game/phonics';
 import { useLatest } from '@/hooks/use-latest';
+import { useSpeak } from '@/hooks/use-speech';
 import { useSuccessFeedback } from '@/hooks/use-success-feedback';
 import { useTheme } from '@/hooks/use-theme';
-import { colorForKey } from '@/lib/kid-colors';
+import { useTouchTarget } from '@/hooks/use-touch-target';
 import { useAppState } from '@/state/app-state';
 
 type Round = {
@@ -48,8 +49,11 @@ function startRound(items: BoardItem[], level: number, previousId?: string): Rou
 export default function LearnScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const touchTarget = useTouchTarget();
+  const keySize = useKeySize();
   const { boardItems, progress, requiredStreak, recordMistake, recordWordCompleted } = useAppState();
   const playSuccess = useSuccessFeedback();
+  const speak = useSpeak();
 
   const [round, setRound] = useState(() => startRound(boardItems, progress.level));
   const [result, setResult] = useState<{ leveledUp: boolean; level: number } | null>(null);
@@ -65,8 +69,8 @@ export default function LearnScreen() {
   const latestRound = useLatest(round);
   const latestResult = useLatest(result);
 
-  const rootRef = useRef<View>(null);
-  const slotNodes = useRef<(View | null)[]>([]);
+  const rootRef = useRef<HostInstance>(null);
+  const slotNodes = useRef<(HostInstance | null)[]>([]);
   const slotRects = useRef<Rect[]>([]);
 
   const ghostX = useSharedValue(0);
@@ -77,17 +81,19 @@ export default function LearnScreen() {
     rootRef.current?.measureInWindow((x, y) => origin.set({ x, y }));
   }, [origin]);
 
-  const registerSlot = useCallback((index: number, node: View | null) => {
+  const registerSlot = useCallback((index: number, node: HostInstance | null) => {
     slotNodes.current[index] = node;
   }, []);
 
   // Gives a light tap and makes the letter's sound (not its name) the instant it's touched,
   // whether or not it turns out to be right.
-  const announceLetter = useCallback((letter: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    Speech.stop();
-    Speech.speak(PHONETIC_SOUND[letter] ?? letter);
-  }, []);
+  const announceLetter = useCallback(
+    (letter: string) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      speak(PHONETIC_SOUND[letter] ?? letter);
+    },
+    [speak],
+  );
 
   // Squares are measured when a drag starts, so the rects are right even after rotation or layout shifts.
   const handleDragStart = useCallback(
@@ -122,6 +128,19 @@ export default function LearnScreen() {
     [announceLetter, showWrong],
   );
 
+  /** Puts a letter in one square: the right letter fills it, a wrong one shows the X. */
+  const placeLetter = (current: Round, letter: string, index: number) => {
+    if (current.item.word[index] !== letter) {
+      showWrong();
+      return;
+    }
+
+    playSuccess();
+    const filled = current.filled.map((placed, i) => (i === index ? letter : placed));
+    setRound({ ...current, filled });
+    if (filled.every((placed) => placed !== null)) setResult(recordWordCompleted(roundCleanRef.current));
+  };
+
   const handleDrop = (letter: string, x: number, y: number) => {
     const current = latestRound.current;
     if (!current || latestResult.current) return;
@@ -138,27 +157,27 @@ export default function LearnScreen() {
     });
     // Dropped away from the squares, or onto one that's already filled: just snap back.
     if (index === -1 || current.filled[index] !== null) return;
+    placeLetter(current, letter, index);
+  };
 
-    if (current.item.word[index] !== letter) {
-      showWrong();
-      return;
-    }
-
-    playSuccess();
-    const filled = current.filled.map((placed, i) => (i === index ? letter : placed));
-    setRound({ ...current, filled });
-    if (filled.every((placed) => placed !== null)) setResult(recordWordCompleted(roundCleanRef.current));
+  // The tap alternative to dragging: a tapped key goes into the first empty square.
+  const handleTap = (letter: string) => {
+    const current = latestRound.current;
+    if (!current || latestResult.current) return;
+    announceLetter(letter);
+    const index = current.filled.indexOf(null);
+    if (index !== -1) placeLetter(current, letter, index);
   };
 
   // Say the finished word out loud once the chime has had a moment to play.
   useEffect(() => {
     if (!result || !round) return;
-    const timer = setTimeout(() => Speech.speak(round.item.word), 500);
+    const timer = setTimeout(() => speak(round.item.word), 500);
     return () => {
       clearTimeout(timer);
       Speech.stop();
     };
-  }, [result, round]);
+  }, [result, round, speak]);
 
   const handleNext = () => {
     slotRects.current = [];
@@ -175,12 +194,17 @@ export default function LearnScreen() {
       onLayout={measureRoot}
       style={[styles.root, { backgroundColor: theme.background }]}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.topBar}>
+        <View style={[styles.column, styles.topBar]}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Back to home"
             onPress={() => router.back()}
-            hitSlop={12}>
+            style={({ pressed }) => [
+              styles.backButton,
+              Chunky.key,
+              { minHeight: touchTarget, minWidth: touchTarget, backgroundColor: theme.backgroundElement },
+              pressed && Chunky.pressed,
+            ]}>
             <ThemedText style={styles.backText}>‹ Back</ThemedText>
           </Pressable>
           <View style={styles.levelInfo}>
@@ -188,17 +212,17 @@ export default function LearnScreen() {
             {!atMaxLevel ? <ProgressDots filled={progress.streak} total={requiredStreak} /> : null}
           </View>
         </View>
-        <ThemedText type="small" themeColor="textSecondary" style={styles.levelDescription}>
+        <ThemedText type="small" themeColor="textSecondary" style={[styles.column, styles.levelDescription]}>
           {describeLevel(progress.level, requiredStreak)}
         </ThemedText>
 
         {round ? (
           <>
-            <View style={styles.body}>
-              <View style={[styles.picture, { backgroundColor: colorForKey(round.item.id) }]}>
+            <View style={[styles.column, styles.body]}>
+              <View style={[styles.picture, Chunky.key, { backgroundColor: theme.backgroundElement }]}>
                 <ItemImage image={round.item.image} size={140} />
               </View>
-              <ThemedText themeColor="textSecondary">Drag the letters to spell it</ThemedText>
+              <ThemedText themeColor="textSecondary">Drag or tap the letters to spell it</ThemedText>
               <LetterSlots
                 word={round.item.word}
                 filled={round.filled}
@@ -207,6 +231,8 @@ export default function LearnScreen() {
               />
             </View>
 
+            {/* The keyboard spans the whole screen width, not the content column, so its keys
+                can be as large as possible. */}
             <View style={styles.keyboardArea}>
               <Keyboard
                 highlighted={round.lit}
@@ -217,12 +243,13 @@ export default function LearnScreen() {
                 onDragStart={handleDragStart}
                 onDrop={handleDrop}
                 onDragEnd={handleDragEnd}
+                onTap={handleTap}
                 onBlockedPress={handleBlockedPress}
               />
             </View>
           </>
         ) : (
-          <View style={styles.empty}>
+          <View style={[styles.column, styles.empty]}>
             <ThemedText type="subtitle" style={styles.centered}>
               Your board is empty
             </ThemedText>
@@ -234,19 +261,21 @@ export default function LearnScreen() {
         )}
 
         {result && round ? (
-          <View style={[styles.celebration, { backgroundColor: theme.backgroundElement }]}>
-            <ThemedText style={styles.celebrationTitle}>
-              {result.leveledUp ? `🎉 Level up! Now on level ${result.level} 🎉` : '🌟 Great job! 🌟'}
-            </ThemedText>
-            <ThemedText type="subtitle" style={styles.celebrationWord}>
-              {round.item.word}
-            </ThemedText>
-            <Button label="Next word" onPress={handleNext} style={styles.nextButton} />
+          <View style={styles.celebrationWrap}>
+            <View style={[styles.celebration, Chunky.key, { backgroundColor: theme.backgroundElement }]}>
+              <ThemedText style={styles.celebrationTitle}>
+                {result.leveledUp ? `Level up! Now on level ${result.level}!` : 'Great job!'}
+              </ThemedText>
+              <ThemedText type="subtitle" style={styles.celebrationWord}>
+                {round.item.word}
+              </ThemedText>
+              <Button label="Next word" onPress={handleNext} style={styles.nextButton} />
+            </View>
           </View>
         ) : null}
       </SafeAreaView>
 
-      <DragGhost letter={draggingLetter} x={ghostX} y={ghostY} />
+      <DragGhost letter={draggingLetter} size={keySize} x={ghostX} y={ghostY} />
       <WrongMark trigger={wrongCount} />
     </View>
   );
@@ -254,8 +283,9 @@ export default function LearnScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  safeArea: {
-    flex: 1,
+  safeArea: { flex: 1 },
+  /** Everything but the keyboard stays in a centered column on wide screens. */
+  column: {
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
@@ -265,10 +295,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.three,
   },
-  backText: { fontSize: 18, fontWeight: 700, color: Palette.primary },
-  levelInfo: { alignItems: 'flex-end', gap: Spacing.one },
+  backButton: {
+    paddingHorizontal: Spacing.three,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backText: { fontSize: 18, lineHeight: 24, fontFamily: FunFont.extraBold, color: Palette.primary },
+  levelInfo: { alignItems: 'flex-end', gap: Spacing.one, flexShrink: 1 },
   levelDescription: { textAlign: 'center', paddingHorizontal: Spacing.four },
   body: {
     flex: 1,
@@ -279,12 +315,11 @@ const styles = StyleSheet.create({
   picture: {
     width: 172,
     height: 172,
-    borderRadius: 86,
     alignItems: 'center',
     justifyContent: 'center',
   },
   keyboardArea: {
-    paddingBottom: Spacing.three,
+    paddingBottom: Spacing.four,
   },
   empty: {
     flex: 1,
@@ -294,18 +329,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
   },
   centered: { textAlign: 'center' },
-  celebration: {
+  celebrationWrap: {
     position: 'absolute',
     left: Spacing.three,
     right: Spacing.three,
-    bottom: Spacing.three,
-    borderRadius: Spacing.four,
+    bottom: Spacing.four,
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  celebration: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
     padding: Spacing.four,
     alignItems: 'center',
     gap: Spacing.two,
-    zIndex: 5,
   },
-  celebrationTitle: { fontSize: 22, fontFamily: FunFont.bold, color: Palette.success, textAlign: 'center' },
-  celebrationWord: { textTransform: 'capitalize', fontFamily: FunFont.bold, fontWeight: 'normal' },
+  celebrationTitle: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontFamily: FunFont.extraBold,
+    color: Palette.primary,
+    textAlign: 'center',
+  },
+  celebrationWord: { textTransform: 'capitalize' },
   nextButton: { alignSelf: 'stretch', marginTop: Spacing.two },
 });

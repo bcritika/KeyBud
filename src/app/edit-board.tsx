@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BoardTile } from '@/components/board-tile';
@@ -8,18 +8,13 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { DEFAULT_ITEMS, type BoardItem } from '@/data/board-items';
+import { useBoardGrid } from '@/hooks/use-board-grid';
 import { useAppState } from '@/state/app-state';
-
-const COLUMNS = 3;
-const GRID_GAP = Spacing.three;
 
 export default function EditBoardScreen() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { tileSize, gap } = useBoardGrid();
   const { customItems, isOnBoard, toggleItem, removeCustomItem, boardItems } = useAppState();
-
-  const contentWidth = Math.min(width, MaxContentWidth) - Spacing.three * 2;
-  const tileSize = Math.floor((contentWidth - GRID_GAP * (COLUMNS - 1)) / COLUMNS);
 
   const confirmDelete = (item: BoardItem) => {
     Alert.alert(`Delete "${item.word}"?`, 'This removes your picture from the app.', [
@@ -29,7 +24,7 @@ export default function EditBoardScreen() {
   };
 
   const renderGrid = (items: BoardItem[], deletable: boolean) => (
-    <View style={styles.grid}>
+    <View style={[styles.grid, { gap }]}>
       {items.map((item) => (
         <BoardTile
           key={item.id}
@@ -89,6 +84,5 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: GRID_GAP,
   },
 });

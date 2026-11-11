@@ -1,104 +1,118 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import '@/global.css';
 
-import { Platform } from 'react-native';
+import { Platform, type ViewStyle } from 'react-native';
 
+/**
+ * The KeyBud palette. Every text/background pair the app uses is checked for at least 4.5:1
+ * contrast by scripts/check-contrast.js; keep that file in sync when changing anything here.
+ */
+export const Brand = {
+  ink: '#17133A',
+  violet: '#3A1FA8',
+  sun: '#FFD21F',
+  coral: '#FF6B4A',
+  mint: '#12D6B0',
+  sky: '#39B7FF',
+  pink: '#FF7BC8',
+  lime: '#B8F03C',
+  paper: '#FFF9EC',
+} as const;
+
+/**
+ * Screen colors. The chunky ink-outlined look is designed for a light paper background, so
+ * the app has a single light theme (app.json pins userInterfaceStyle to light).
+ */
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-  },
-  dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: Brand.ink,
+    background: Brand.paper,
+    /** Cards, inputs and secondary buttons: white panels with an ink outline on the paper. */
+    backgroundElement: '#FFFFFF',
+    backgroundSelected: Brand.sun,
+    /** A softened ink for supporting copy. Still 4.5:1 or better on paper and on white. */
+    textSecondary: '#4D4870',
   },
 } as const;
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+export type ThemeColor = keyof typeof Colors.light;
 
-/**
- * Fixed accent colors that read well in both light and dark mode. Every color here was checked
- * against the text color it's meant to sit under (see scripts/check-contrast.js): onPrimary
- * (white) on primary/danger, onAccent (near-black) on success/highlight/the KidColors below.
- */
+/** Role names for the brand colors, plus the text color that reads on each. */
 export const Palette = {
-  primary: '#3E4FE0',
-  /** The pressed-in "3D edge" under primary buttons. */
-  primaryDark: '#2D39A1',
-  /** A translucent wash of primary, e.g. behind the selected tab. Works over light or dark. */
-  primarySoft: 'rgba(62, 79, 224, 0.16)',
-  success: '#128A45',
-  /** The correct-letter square fill; paired with onAccent text, not onPrimary. */
-  successFill: '#51CF66',
-  danger: '#E03131',
-  /** The pressed-in "3D edge" under danger buttons. */
-  dangerDark: '#A12323',
-  highlight: '#FFD43B',
-  onAccent: '#1B1B1F',
-  onPrimary: '#FFFFFF',
+  primary: Brand.violet,
+  /** A translucent wash of primary, e.g. behind the selected tab. */
+  primarySoft: 'rgba(58, 31, 168, 0.14)',
+  success: Brand.mint,
+  /** The correct-letter square fill; paired with onAccent text. */
+  successFill: Brand.mint,
+  danger: Brand.coral,
+  highlight: Brand.sun,
+  /** Text and icons on every bright fill (sun, coral, mint, sky, pink, lime). */
+  onAccent: Brand.ink,
+  /** Text and icons on violet. */
+  onPrimary: Brand.paper,
+  outline: Brand.ink,
 } as const;
 
 /**
- * A cheerful, high-contrast set of colors for things a learner picks out or drags: board tiles,
- * keyboard keys, progress dots. Always pair these with Palette.onAccent (dark) text or icons -
- * every one of them was checked to read clearly with dark text, not white.
+ * Fills for things a learner picks out or drags: board tiles, keyboard keys, progress dots.
+ * All of them take Palette.onAccent (ink) text. Violet is left out because it needs light text.
  */
-export const KidColors = [
-  '#FF6B6B', // coral
-  '#FFA94D', // tangerine
-  '#FFD43B', // sunshine
-  '#69DB7C', // grass
-  '#4DABF7', // sky
-  '#9775FA', // grape
-  '#F783AC', // bubblegum
-  '#3BC9DB', // turquoise
-] as const;
+export const KidColors = [Brand.sun, Brand.coral, Brand.mint, Brand.sky, Brand.pink, Brand.lime] as const;
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
     /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
     mono: 'monospace',
   },
   web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
     mono: 'var(--font-mono)',
   },
 });
 
 /**
- * A friendly, rounded display font (Fredoka, loaded in app/_layout.tsx) used for the big,
- * playful moments: the app title, letters in play, and button labels. Body copy stays on the
- * system font (Fonts above), which stays more legible at small sizes.
+ * Baloo 2 for keys, letters and headlines; Nunito for everything else. Both are loaded in
+ * app/_layout.tsx. Each name is one specific weight, so styles using them set fontWeight to
+ * 'normal' rather than a number, which would make some platforms fake a weight or drop the font.
  */
 export const FunFont = {
-  medium: 'Fredoka_500Medium',
-  semiBold: 'Fredoka_600SemiBold',
-  bold: 'Fredoka_700Bold',
+  semiBold: 'Baloo2_600SemiBold',
+  extraBold: 'Baloo2_800ExtraBold',
 } as const;
+
+export const BodyFont = {
+  bold: 'Nunito_700Bold',
+  extraBold: 'Nunito_800ExtraBold',
+} as const;
+
+/** The chunky key look: a thick ink outline, round corners and a hard shadow underneath. */
+export const KEY_OUTLINE = 4;
+export const KEY_RADIUS = 24;
+export const KEY_DEPTH = 6;
+export const KEY_LIFT_SHADOW = 16;
+
+export const Chunky = {
+  key: {
+    borderWidth: KEY_OUTLINE,
+    borderColor: Brand.ink,
+    borderRadius: KEY_RADIUS,
+    boxShadow: `0 ${KEY_DEPTH}px 0 ${Brand.ink}`,
+  },
+  /** Pressed: the key sinks onto its shadow. */
+  pressed: {
+    transform: [{ translateY: KEY_DEPTH }],
+    boxShadow: 'none',
+  },
+  /** Picked up and being dragged. */
+  lifted: {
+    transform: [{ rotate: '-4deg' }, { scale: 1.05 }],
+    boxShadow: `0 ${KEY_LIFT_SHADOW}px 0 ${Brand.ink}`,
+  },
+  /** The spot a dragged key left behind. */
+  leftBehind: { opacity: 0.45 },
+} satisfies Record<string, ViewStyle>;
 
 export const Spacing = {
   half: 2,
@@ -109,6 +123,11 @@ export const Spacing = {
   five: 32,
   six: 64,
 } as const;
+
+/** The smallest a tappable control may be, in each direction. See hooks/use-touch-target.ts. */
+export const TouchTarget = { tablet: 88, phone: 44 } as const;
+/** Screens at least this wide on their short side count as tablets. */
+export const TabletMinWidth = 600;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;

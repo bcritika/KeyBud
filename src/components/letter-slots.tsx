@@ -1,21 +1,25 @@
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions, type HostInstance } from 'react-native';
 
-import { FunFont, MaxContentWidth, Palette, Spacing } from '@/constants/theme';
+import { FunFont, KEY_OUTLINE, KEY_RADIUS, MaxContentWidth, Palette, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 const SLOT_GAP = Spacing.two;
-const MAX_SLOT_SIZE = 72;
+const MAX_SLOT_SIZE = 80;
 
 type LetterSlotsProps = {
   word: string;
   /** One entry per letter: the letter placed there, or null while still empty. */
   filled: (string | null)[];
-  /** Show a faint copy of each missing letter as a scaffold for early levels. */
+  /** Show a copy of each missing letter as a scaffold for early levels. */
   showGhost: boolean;
   /** Lets the screen measure each square so it can tell which one a drop landed on. */
-  registerSlot: (index: number, node: View | null) => void;
+  registerSlot: (index: number, node: HostInstance | null) => void;
 };
 
+/**
+ * The squares the word is spelled into. An empty square is white with a dashed outline; a
+ * filled one turns mint with a solid outline and shows its letter, so "done" is never color alone.
+ */
 export function LetterSlots({ word, filled, showGhost, registerSlot }: LetterSlotsProps) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
@@ -38,15 +42,13 @@ export function LetterSlots({ word, filled, showGhost, registerSlot }: LetterSlo
               styles.slot,
               { width: size, height: size + 8 },
               placed
-                ? { backgroundColor: Palette.successFill, borderColor: Palette.successFill, borderStyle: 'solid' }
-                : { backgroundColor: theme.backgroundElement, borderColor: theme.textSecondary },
+                ? { backgroundColor: Palette.successFill, borderStyle: 'solid' }
+                : { backgroundColor: theme.backgroundElement },
             ]}>
             {placed ? (
               <Text style={[styles.letter, { color: Palette.onAccent }]}>{placed.toUpperCase()}</Text>
             ) : showGhost ? (
-              <Text style={[styles.letter, { color: theme.textSecondary, opacity: 0.3 }]}>
-                {expected.toUpperCase()}
-              </Text>
+              <Text style={[styles.letter, { color: theme.textSecondary }]}>{expected.toUpperCase()}</Text>
             ) : null}
           </View>
         );
@@ -62,14 +64,16 @@ const styles = StyleSheet.create({
     gap: SLOT_GAP,
   },
   slot: {
-    borderRadius: 14,
-    borderWidth: 3,
+    borderRadius: KEY_RADIUS,
+    borderWidth: KEY_OUTLINE,
+    borderColor: Palette.outline,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
   },
   letter: {
     fontSize: 36,
-    fontFamily: FunFont.bold,
+    lineHeight: 48,
+    fontFamily: FunFont.extraBold,
   },
 });

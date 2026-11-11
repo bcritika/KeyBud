@@ -1,19 +1,22 @@
 import { Image } from 'expo-image';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import type { ItemImage as ItemImageData } from '@/data/board-items';
+import { symbolSource } from '@/data/symbols';
 import { resolvePhotoUri } from '@/lib/images';
 import { useAppState } from '@/state/app-state';
 
-/** Renders a board item's picture, whether it's a built-in emoji or an uploaded photo. */
+/** Renders a board item's picture, whether it's a bundled pictogram or an uploaded photo. */
 export function ItemImage({ image, size }: { image: ItemImageData; size: number }) {
   const { photosVersion } = useAppState();
 
-  if (image.kind === 'emoji') {
-    return (
-      <Text style={{ fontSize: size * 0.8, lineHeight: size, height: size, textAlign: 'center' }}>
-        {image.value}
-      </Text>
+  if (image.kind === 'symbol') {
+    const source = symbolSource(image.key);
+    // An unknown key (from a newer app version, say) leaves an empty space rather than crashing.
+    return source ? (
+      <Image source={source} style={{ width: size, height: size }} contentFit="contain" />
+    ) : (
+      <View style={{ width: size, height: size }} />
     );
   }
   return (

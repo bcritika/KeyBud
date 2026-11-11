@@ -2,27 +2,30 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { ItemImage } from '@/components/item-image';
-import { TextField } from '@/components/text-field';
+import { FieldMessage, TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Palette, Spacing } from '@/constants/theme';
-import { EMOJI_CHOICES } from '@/data/board-items';
+import { BodyFont, Chunky, KEY_OUTLINE, MaxContentWidth, Palette, Spacing } from '@/constants/theme';
+import { SYMBOL_KEYS, type SymbolKey } from '@/data/symbols';
+import { useTheme } from '@/hooks/use-theme';
+import { useTouchTarget } from '@/hooks/use-touch-target';
 import { savePhoto } from '@/lib/images';
-import { colorForKey } from '@/lib/kid-colors';
 import { isValidWord, normalizeWord } from '@/lib/validation';
 import { useAppState } from '@/state/app-state';
 
 /** What the user has picked so far. A photo stays in the picker's temporary cache until saved. */
-type Choice = { kind: 'emoji'; value: string } | { kind: 'photo'; uri: string };
+type Choice = { kind: 'symbol'; key: SymbolKey } | { kind: 'photo'; uri: string };
 
 export default function AddItemScreen() {
   const router = useRouter();
   const { allItems, addCustomItem } = useAppState();
+  const theme = useTheme();
+  const symbolSize = Math.max(76, useTouchTarget());
   const [word, setWord] = useState('');
   const [choice, setChoice] = useState<Choice | null>(null);
   const [wordError, setWordError] = useState<string>();
@@ -40,6 +43,13 @@ export default function AddItemScreen() {
       setChoice({ kind: 'photo', uri: picked.assets[0].uri });
       setImageError(undefined);
     }
+  };
+
+  // Picking a picture fills in its word too, if the field is still empty and that word is free.
+  const pickSymbol = (key: SymbolKey) => {
+    setChoice({ kind: 'symbol', key });
+    setImageError(undefined);
+    if (!word.trim() && !allItems.some((item) => item.word === key)) setWord(key);
   };
 
   const handleSave = async () => {
@@ -88,9 +98,7 @@ export default function AddItemScreen() {
 
           <ThemedText type="smallBold">Picture</ThemedText>
           <View style={styles.previewRow}>
-            <ThemedView
-              type="backgroundElement"
-              style={[styles.preview, choice?.kind === 'emoji' && { backgroundColor: colorForKey(choice.value) }]}>
+            <ThemedView type="backgroundElement" style={styles.preview}>
               {choice?.kind === 'photo' ? (
                 // Not saved yet, so preview straight from the picker's temporary file.
                 <Image source={{ uri: choice.uri }} style={styles.photoPreview} contentFit="cover" />
@@ -102,36 +110,46 @@ export default function AddItemScreen() {
             </ThemedView>
             <Button label="Upload a photo" variant="secondary" onPress={pickPhoto} style={styles.flex} />
           </View>
-          {imageError ? (
-            <ThemedText type="small" style={{ color: Palette.danger }}>
-              {imageError}
-            </ThemedText>
-          ) : null}
+          {imageError ? <FieldMessage kind="error">{imageError}</FieldMessage> : null}
 
           <ThemedText themeColor="textSecondary">Or pick a ready-made picture:</ThemedText>
-          <View style={styles.emojiGrid}>
-            {EMOJI_CHOICES.map((emoji) => {
-              const selected = choice?.kind === 'emoji' && choice.value === emoji;
+          <View style={styles.symbolGrid}>
+            {SYMBOL_KEYS.map((key) => {
+              const selected = choice?.kind === 'symbol' && choice.key === key;
               return (
                 <Pressable
-                  key={emoji}
+                  key={key}
                   accessibilityRole="button"
-                  accessibilityLabel={`Use picture ${emoji}`}
+                  accessibilityLabel={`Use picture: ${key}`}
                   accessibilityState={{ selected }}
-                  onPress={() => {
-                    setChoice({ kind: 'emoji', value: emoji });
-                    setImageError(undefined);
-                  }}
-                  style={[
-                    styles.emojiButton,
-                    { backgroundColor: colorForKey(emoji) },
-                    selected && styles.emojiSelected,
+                  onPress={() => pickSymbol(key)}
+                  style={({ pressed }) => [
+                    styles.symbolButton,
+                    Chunky.key,
+                    {
+                      width: symbolSize,
+                      height: symbolSize + 20,
+                      backgroundColor: selected ? Palette.highlight : theme.backgroundElement,
+                    },
+                    // The chosen picture sinks in and gets a check badge, not just a new color.
+                    (pressed || selected) && Chunky.pressed,
                   ]}>
-                  <ThemedText style={styles.emoji}>{emoji}</ThemedText>
+                  <ItemImage image={{ kind: 'symbol', key }} size={symbolSize - 24} />
+                  <ThemedText type="small" numberOfLines={1}>
+                    {key}
+                  </ThemedText>
+                  {selected ? (
+                    <View style={styles.symbolCheck}>
+                      <Text style={styles.symbolCheckMark}>✓</Text>
+                    </View>
+                  ) : null}
                 </Pressable>
               );
             })}
           </View>
+          <ThemedText type="small" themeColor="textSecondary">
+            Pictures: ARASAAC (arasaac.org), CC BY-NC-SA.
+          </ThemedText>
 
           <Button label={saving ? 'Saving...' : 'Add to my board'} onPress={handleSave} disabled={saving} />
         </ScrollView>
@@ -159,21 +177,31 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: Spacing.three,
+    borderWidth: KEY_OUTLINE,
+    borderColor: Palette.outline,
     alignItems: 'center',
     justifyContent: 'center',
   },
   photoPreview: { width: 96, height: 96, borderRadius: 12 },
   flex: { flex: 1 },
-  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  emojiButton: {
-    width: 56,
-    height: 56,
+  symbolGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three },
+  symbolButton: {
     borderRadius: Spacing.three,
-    borderWidth: 3,
-    borderColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emojiSelected: { borderColor: Palette.primary },
-  emoji: { fontSize: 30, lineHeight: 38 },
+  symbolCheck: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 3,
+    borderColor: Palette.outline,
+    backgroundColor: Palette.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  symbolCheckMark: { fontSize: 13, lineHeight: 17, fontFamily: BodyFont.extraBold, color: Palette.onAccent },
 });

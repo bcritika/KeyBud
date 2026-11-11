@@ -4,15 +4,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { Stepper } from '@/components/stepper';
-import { TextField } from '@/components/text-field';
+import { FieldMessage, TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, FunFont, MaxContentWidth, Palette, Spacing } from '@/constants/theme';
+import { VoicePicker } from '@/components/voice-picker';
+import { BottomTabInset, Chunky, FunFont, MaxContentWidth, Palette, Spacing } from '@/constants/theme';
 import { describeLevel, MAX_LEVEL, MAX_REQUIRED_STREAK, MIN_REQUIRED_STREAK } from '@/game/levels';
+import { useBoardGrid } from '@/hooks/use-board-grid';
+import { useSpeak } from '@/hooks/use-speech';
 import { colorForKey } from '@/lib/kid-colors';
 import { cleanPhone, isValidEmail, isValidPhone } from '@/lib/validation';
 import { useAppState, type Contact, type SyncStatus } from '@/state/app-state';
 import { useAuth } from '@/state/auth';
+import {
+  MAX_SPEECH_RATE,
+  MIN_GRID_COLUMNS,
+  MIN_SPEECH_RATE,
+  SPEECH_RATE_STEP,
+  usePreferences,
+} from '@/state/preferences';
 
 const LEVEL_NUMBERS = Array.from({ length: MAX_LEVEL }, (_, index) => index + 1);
 
@@ -30,6 +40,12 @@ function describeSync(status: SyncStatus, pending: number, lastSyncedAt: string 
   return `Up to date. Last synced at ${time}.`;
 }
 
+function describeRate(rate: number) {
+  if (rate < 1) return `${rate}× slower`;
+  if (rate > 1) return `${rate}× faster`;
+  return '1× normal';
+}
+
 export default function SettingsScreen() {
   const { session, signOut } = useAuth();
   const {
@@ -43,13 +59,32 @@ export default function SettingsScreen() {
     pendingChanges,
     lastSyncedAt,
     syncNow,
+    deleteAccount,
   } = useAppState();
+  const { voiceId, speechRate, setPreferences } = usePreferences();
+  const { columns, maxColumns } = useBoardGrid();
+  const speak = useSpeak();
   // Fields show the saved contact until edited, so a contact arriving from the cloud after this
   // screen opens still appears, and saving never overwrites it with stale blanks.
   const [draft, setDraft] = useState<Partial<Contact>>({});
   const { name, phone, email } = { ...contact, ...draft };
   const [errors, setErrors] = useState<{ phone?: string; email?: string }>({});
   const [saved, setSaved] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      // On success the session ends and the app returns to the sign-in screen by itself.
+      await deleteAccount();
+    } catch {
+      setDeleteError("Couldn't delete your account. Check your internet connection and try again.");
+      setDeleting(false);
+    }
+  };
 
   const handleSave = () => {
     // Both fields are optional, but whatever is filled in has to look right.
@@ -96,11 +131,42 @@ export default function SettingsScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets>
-          <ThemedText type="subtitle" style={styles.title}>
-            Settings
-          </ThemedText>
+          <ThemedText type="subtitle">Settings</ThemedText>
 
           <ThemedText type="smallBold" themeColor="textSecondary">
+            BOARD AND VOICE
+          </ThemedText>
+          <ThemedText themeColor="textSecondary">
+            These are saved on this device only, since every device has its own screen size and voices.
+          </ThemedText>
+          <Stepper
+            label="Pictures in each row"
+            value={columns}
+            min={MIN_GRID_COLUMNS}
+            max={maxColumns}
+            onChange={(gridColumns) => setPreferences({ gridColumns })}
+          />
+          <Stepper
+            label="Speaking speed"
+            value={speechRate}
+            min={MIN_SPEECH_RATE}
+            max={MAX_SPEECH_RATE}
+            step={SPEECH_RATE_STEP}
+            formatValue={(rate) => `${rate}×`}
+            onChange={(rate) => setPreferences({ speechRate: rate })}
+          />
+          <ThemedText type="small" themeColor="textSecondary">
+            {describeRate(speechRate)}
+          </ThemedText>
+          <ThemedText type="smallBold">Voice</ThemedText>
+          <VoicePicker voiceId={voiceId} onChange={(id) => setPreferences({ voiceId: id })} />
+          <Button
+            label="Hear this voice"
+            variant="secondary"
+            onPress={() => speak('Hi! I am your KeyBud voice.')}
+          />
+
+          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionGap}>
             WHO TO NOTIFY
           </ThemedText>
           <ThemedText themeColor="textSecondary">
@@ -133,11 +199,7 @@ export default function SettingsScreen() {
             error={errors.email}
           />
           <Button label="Save" onPress={handleSave} />
-          {saved ? (
-            <ThemedText style={styles.saved} accessibilityLiveRegion="polite">
-              Saved
-            </ThemedText>
-          ) : null}
+          {saved ? <FieldMessage kind="success">Saved</FieldMessage> : null}
 
           <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionGap}>
             LEVELS
@@ -153,7 +215,7 @@ export default function SettingsScreen() {
             max={MAX_REQUIRED_STREAK}
             onChange={setRequiredStreak}
           />
-          <ThemedView type="backgroundElement" style={styles.levelList}>
+          <ThemedView type="backgroundElement" style={[styles.levelList, Chunky.key]}>
             {LEVEL_NUMBERS.map((level) => (
               <View key={level} style={styles.levelRow}>
                 <View style={[styles.levelNumber, { backgroundColor: colorForKey(`level-${level}`) }]}>
@@ -181,6 +243,43 @@ export default function SettingsScreen() {
             disabled={syncStatus === 'syncing'}
           />
           <Button label="Sign out" variant="secondary" onPress={handleSignOut} />
+
+          {/* A confirm step on the screen itself rather than a pop-up, so it works on the web too. */}
+          {confirmingDelete ? (
+            <ThemedView type="backgroundElement" style={[styles.deleteCard, Chunky.key]}>
+              <ThemedText type="smallBold">Delete your account for good?</ThemedText>
+              <ThemedText type="small">
+                This permanently deletes your account, your board, your own pictures and photos, your
+                level and progress, and your contact details, on every device. It can&apos;t be undone.
+              </ThemedText>
+              {deleteError ? <FieldMessage kind="error">{deleteError}</FieldMessage> : null}
+              <Button
+                label={deleting ? 'Deleting...' : 'Yes, delete everything'}
+                variant="danger"
+                onPress={handleDeleteAccount}
+                disabled={deleting}
+              />
+              <Button
+                label="Keep my account"
+                variant="secondary"
+                onPress={() => {
+                  setConfirmingDelete(false);
+                  setDeleteError(null);
+                }}
+                disabled={deleting}
+              />
+            </ThemedView>
+          ) : (
+            <Button label="Delete my account" variant="danger" onPress={() => setConfirmingDelete(true)} />
+          )}
+
+          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionGap}>
+            PICTURE CREDITS
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            Pictograms by Sergio Palao, from ARASAAC (arasaac.org), owned by the Government of Aragón
+            (Spain), and shared under the CC BY-NC-SA 4.0 license.
+          </ThemedText>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -202,18 +301,19 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.four,
   },
-  title: { fontFamily: FunFont.semiBold, fontWeight: 'normal' },
-  saved: { color: Palette.success, fontWeight: 700, textAlign: 'center' },
   sectionGap: { marginTop: Spacing.three },
   levelList: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  deleteCard: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.three },
   levelRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   levelNumber: {
     width: 32,
     height: 32,
     borderRadius: 16,
+    borderWidth: 3,
+    borderColor: Palette.outline,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  levelNumberText: { fontSize: 14, fontFamily: FunFont.bold, color: Palette.onAccent },
+  levelNumberText: { fontSize: 14, lineHeight: 20, fontFamily: FunFont.extraBold, color: Palette.onAccent },
   flex: { flex: 1 },
 });

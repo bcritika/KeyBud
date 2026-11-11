@@ -1,11 +1,11 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ItemImage } from '@/components/item-image';
 import { ThemedText } from '@/components/themed-text';
-import { Palette, Spacing } from '@/constants/theme';
+import { BodyFont, Chunky, Palette, Spacing } from '@/constants/theme';
 import type { BoardItem } from '@/data/board-items';
 import { useTheme } from '@/hooks/use-theme';
-import { colorForKey } from '@/lib/kid-colors';
+import { useTouchTarget } from '@/hooks/use-touch-target';
 
 type BoardTileProps = {
   item: BoardItem;
@@ -20,8 +20,11 @@ type BoardTileProps = {
 /** One picture-and-word tile, used both on the board itself and when choosing what's on it. */
 export function BoardTile({ item, size, onPress, selected, onDelete }: BoardTileProps) {
   const theme = useTheme();
+  const touchTarget = useTouchTarget();
   const isSelectable = selected !== undefined;
-  const backdropSize = Math.round(size * 0.7);
+  // The delete button is drawn smaller than a touch target, and hitSlop makes up the rest.
+  const deleteSize = Math.round(touchTarget * 0.7);
+  const deleteSlop = Math.ceil((touchTarget - deleteSize) / 2);
 
   return (
     <View style={{ width: size }}>
@@ -32,27 +35,19 @@ export function BoardTile({ item, size, onPress, selected, onDelete }: BoardTile
         onPress={onPress}
         style={({ pressed }) => [
           styles.tile,
-          {
-            height: size,
-            backgroundColor: theme.backgroundElement,
-            borderColor: selected ? Palette.primary : 'transparent',
-          },
-          pressed && styles.pressed,
+          Chunky.key,
+          // Selected tiles turn sun-yellow AND get a check badge, so selection isn't color alone.
+          { height: size, backgroundColor: selected ? Palette.highlight : theme.backgroundElement },
+          pressed && Chunky.pressed,
         ]}>
-        <View
-          style={[
-            styles.imageBackdrop,
-            { width: backdropSize, height: backdropSize, borderRadius: backdropSize / 2 },
-            { backgroundColor: colorForKey(item.id) },
-          ]}>
-          <ItemImage image={item.image} size={Math.round(size * 0.42)} />
-        </View>
+        {/* Like a printed board: the picture large on a plain card, with its word underneath. */}
+        <ItemImage image={item.image} size={Math.round(size * 0.62)} />
         <ThemedText type="smallBold" style={styles.word} numberOfLines={1}>
           {item.word}
         </ThemedText>
         {selected ? (
           <View style={styles.check}>
-            <ThemedText style={styles.checkMark}>✓</ThemedText>
+            <Text style={styles.badgeMark}>✓</Text>
           </View>
         ) : null}
       </Pressable>
@@ -61,49 +56,49 @@ export function BoardTile({ item, size, onPress, selected, onDelete }: BoardTile
           accessibilityRole="button"
           accessibilityLabel={`Delete ${item.word}`}
           onPress={onDelete}
-          hitSlop={8}
-          style={styles.delete}>
-          <ThemedText style={styles.deleteMark}>✕</ThemedText>
+          hitSlop={deleteSlop}
+          style={[
+            styles.delete,
+            { width: deleteSize, height: deleteSize, borderRadius: deleteSize / 2 },
+          ]}>
+          <Text style={styles.badgeMark}>✕</Text>
         </Pressable>
       ) : null}
     </View>
   );
 }
 
+const badge = {
+  borderWidth: 3,
+  borderColor: Palette.outline,
+  alignItems: 'center',
+  justifyContent: 'center',
+} as const;
+
 const styles = StyleSheet.create({
   tile: {
-    borderRadius: Spacing.three,
-    borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.one,
     padding: Spacing.one,
   },
-  pressed: { opacity: 0.7 },
-  imageBackdrop: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  word: { fontSize: 16, textTransform: 'capitalize' },
+  word: { fontSize: 16, lineHeight: 22, textTransform: 'capitalize' },
   check: {
+    ...badge,
     position: 'absolute',
     top: 6,
     right: 6,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Palette.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Palette.success,
   },
-  checkMark: { color: Palette.onPrimary, fontSize: 14, lineHeight: 18, fontWeight: 800 },
+  badgeMark: { color: Palette.onAccent, fontSize: 15, lineHeight: 20, fontFamily: BodyFont.extraBold },
   delete: {
+    ...badge,
     position: 'absolute',
-    top: -6,
-    left: -6,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    top: -8,
+    left: -8,
     backgroundColor: Palette.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  deleteMark: { color: Palette.onPrimary, fontSize: 13, lineHeight: 16, fontWeight: 800 },
 });

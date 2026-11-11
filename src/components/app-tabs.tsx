@@ -1,20 +1,18 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { useColorScheme } from 'react-native';
 
-import { Colors, FunFont, Palette } from '@/constants/theme';
+import { BodyFont, Colors, Palette } from '@/constants/theme';
 
 export default function AppTabs() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const colors = Colors.light;
 
   return (
     <NativeTabs
       backgroundColor={colors.background}
-      indicatorColor={Palette.primarySoft}
+      indicatorColor={Palette.highlight}
       iconColor={{ default: colors.textSecondary, selected: Palette.primary }}
       labelStyle={{
-        default: { color: colors.textSecondary },
-        selected: { color: Palette.primary, fontFamily: FunFont.semiBold },
+        default: { color: colors.textSecondary, fontFamily: BodyFont.bold },
+        selected: { color: Palette.primary, fontFamily: BodyFont.extraBold },
       }}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Learn</NativeTabs.Trigger.Label>

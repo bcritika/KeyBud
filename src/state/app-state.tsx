@@ -14,6 +14,7 @@ import { AppState as NativeAppState } from 'react-native';
 import { DEFAULT_ITEMS, type BoardItem } from '@/data/board-items';
 import { applySyncResult, pendingCount } from '@/data/merge';
 import {
+  clearCache,
   INITIAL_STATE,
   loadCache,
   saveCache,
@@ -21,7 +22,7 @@ import {
   type Outbox,
   type PersistedState,
 } from '@/data/persisted-state';
-import { downloadMissingPhotos, runSync } from '@/data/remote';
+import { deleteRemoteAccount, downloadMissingPhotos, runSync } from '@/data/remote';
 import {
   advanceProgress,
   INITIAL_PROGRESS,
@@ -71,6 +72,11 @@ type AppState = {
   recordWordCompleted: (wasClean: boolean) => { leveledUp: boolean; level: number };
   resetProgress: () => void;
   syncNow: () => Promise<void>;
+  /**
+   * Permanently deletes the account, its data on the server, and its copy on this device, then
+   * signs out. Needs a connection; throws (leaving everything in place) if it can't finish.
+   */
+  deleteAccount: () => Promise<void>;
 };
 
 const AppStateContext = createContext<AppState | null>(null);
@@ -95,7 +101,7 @@ const withSettingsChange = (
 });
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
-  const { session } = useAuth();
+  const { session, forgetSession } = useAuth();
   const userId = session?.user.id ?? null;
 
   const [state, setState] = useState<PersistedState>(INITIAL_STATE);
@@ -276,6 +282,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const deleteAccount = useCallback(async () => {
+    if (!userId) return;
+    await deleteRemoteAccount(userId);
+    // The account is gone from the server; now clear what this device kept for it.
+    for (const item of latestState.current.customItems) {
+      if (item.image.kind === 'photo') deletePhoto(item.image.file);
+    }
+    await clearCache(userId);
+    await forgetSession();
+  }, [userId, latestState, forgetSession]);
+
   const value: AppState = {
     ready,
     allItems,
@@ -298,6 +315,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     recordWordCompleted,
     resetProgress,
     syncNow,
+    deleteAccount,
   };
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

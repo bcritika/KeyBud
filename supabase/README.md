@@ -6,10 +6,11 @@ it to Supabase in the background so the board, photos and progress follow the us
 ## One-time setup
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor**, paste in `migrations/20260920000000_init.sql`, and run it. (Or use the
+2. Open **SQL Editor** and run each file in `migrations/`, oldest first. (Or use the
    Supabase CLI: `supabase link` then `supabase db push`.) This creates the tables, the
-   row-level-security policies that keep each user's data private, and the private
-   `board-photos` storage bucket.
+   row-level-security policies that keep each user's data private, the private
+   `board-photos` storage bucket, and the `delete_my_account` function behind the app's
+   **Delete my account** button.
 3. In **Project Settings > API**, copy the project URL and the `anon` public key.
 4. Copy `.env.example` to `.env.local` at the project root and fill both values in.
 5. Restart `npm start` (Expo reads env vars at startup).

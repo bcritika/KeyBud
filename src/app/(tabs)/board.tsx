@@ -1,42 +1,36 @@
 import { useRouter } from 'expo-router';
-import * as Speech from 'expo-speech';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BoardTile } from '@/components/board-tile';
 import { Button } from '@/components/button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, FunFont, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, Chunky, FunFont, MaxContentWidth, Spacing } from '@/constants/theme';
 import type { BoardItem } from '@/data/board-items';
+import { useBoardGrid } from '@/hooks/use-board-grid';
+import { useSpeak } from '@/hooks/use-speech';
 import { availableChannels, notifyContact, type NotifyChannel } from '@/lib/notify';
 import { useAppState } from '@/state/app-state';
 
-const COLUMNS = 3;
-const GRID_GAP = Spacing.three;
 const MAX_MESSAGE_LENGTH = 8;
 
 export default function BoardScreen() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
   const { boardItems, contact } = useAppState();
+  const { tileSize, gap } = useBoardGrid();
+  const speak = useSpeak();
   const [message, setMessage] = useState<BoardItem[]>([]);
 
-  const contentWidth = Math.min(width, MaxContentWidth) - Spacing.three * 2;
-  const tileSize = Math.floor((contentWidth - GRID_GAP * (COLUMNS - 1)) / COLUMNS);
   const words = message.map((item) => item.word);
 
   const handleTilePress = (item: BoardItem) => {
-    Speech.stop();
-    Speech.speak(item.word);
+    speak(item.word);
     setMessage((prev) => [...prev.slice(-(MAX_MESSAGE_LENGTH - 1)), item]);
   };
 
-  const handleSpeak = () => {
-    Speech.stop();
-    Speech.speak(words.join(' '));
-  };
+  const handleSpeak = () => speak(words.join(' '));
 
   const send = async (channel: NotifyChannel) => {
     try {
@@ -68,13 +62,11 @@ export default function BoardScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.header}>
-          <ThemedText type="subtitle" style={styles.headerTitle}>
-            My Board
-          </ThemedText>
+          <ThemedText type="subtitle">My Board</ThemedText>
           <Button label="Edit" variant="secondary" onPress={() => router.push('/edit-board')} style={styles.editButton} />
         </View>
 
-        <ThemedView type="backgroundElement" style={styles.messageBar}>
+        <ThemedView type="backgroundElement" style={[styles.messageBar, Chunky.key]}>
           <ThemedText
             style={styles.messageText}
             themeColor={words.length ? 'text' : 'textSecondary'}
@@ -95,7 +87,7 @@ export default function BoardScreen() {
         </ThemedView>
 
         {boardItems.length ? (
-          <ScrollView contentContainerStyle={styles.grid}>
+          <ScrollView contentContainerStyle={[styles.grid, { gap }]}>
             {boardItems.map((item) => (
               <BoardTile key={item.id} item={item} size={tileSize} onPress={() => handleTilePress(item)} />
             ))}
@@ -130,29 +122,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
   },
-  headerTitle: { fontFamily: FunFont.semiBold, fontWeight: 'normal' },
-  editButton: { minHeight: 44, paddingHorizontal: Spacing.three },
+  editButton: { paddingHorizontal: Spacing.four },
   messageBar: {
     marginHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
     padding: Spacing.three,
     gap: Spacing.three,
   },
   messageText: {
-    fontSize: 22,
-    lineHeight: 30,
-    fontFamily: FunFont.bold,
-    fontWeight: 'normal',
-    minHeight: 30,
+    fontSize: 24,
+    lineHeight: 32,
+    fontFamily: FunFont.extraBold,
+    minHeight: 32,
     textTransform: 'capitalize',
   },
   messageActions: { flexDirection: 'row', gap: Spacing.two },
-  actionButton: { flex: 1, minHeight: 48, paddingHorizontal: Spacing.two },
+  actionButton: { flex: 1, paddingHorizontal: Spacing.two },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: GRID_GAP,
     padding: Spacing.three,
+    paddingTop: Spacing.four,
     paddingBottom: BottomTabInset + Spacing.four,
   },
   empty: {

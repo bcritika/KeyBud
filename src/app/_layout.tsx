@@ -1,20 +1,28 @@
-import {
-  Fredoka_500Medium,
-  Fredoka_600SemiBold,
-  Fredoka_700Bold,
-  useFonts,
-} from '@expo-google-fonts/fredoka';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { Baloo2_600SemiBold, Baloo2_800ExtraBold } from '@expo-google-fonts/baloo-2';
+import { Nunito_700Bold, Nunito_800ExtraBold, useFonts } from '@expo-google-fonts/nunito';
+import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { FunFont, Palette } from '@/constants/theme';
+import { Brand, FunFont, Palette } from '@/constants/theme';
 import { AppStateProvider, useAppState } from '@/state/app-state';
 import { AuthProvider, useAuth } from '@/state/auth';
+import { PreferencesProvider } from '@/state/preferences';
 
 SplashScreen.preventAutoHideAsync();
+
+const NavigationTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: Palette.primary,
+    background: Brand.paper,
+    card: Brand.paper,
+    text: Brand.ink,
+    border: Brand.ink,
+  },
+};
 
 function RootStack() {
   const { session, loading } = useAuth();
@@ -22,10 +30,15 @@ function RootStack() {
   // These are bundled asset files, not a network fetch, so this never blocks on connectivity.
   // If it somehow errors, fontsError still lets the app proceed on the system font instead of
   // hanging on the splash screen forever.
-  const [fontsLoaded, fontsError] = useFonts({ Fredoka_500Medium, Fredoka_600SemiBold, Fredoka_700Bold });
+  const [fontsLoaded, fontsError] = useFonts({
+    Baloo2_600SemiBold,
+    Baloo2_800ExtraBold,
+    Nunito_700Bold,
+    Nunito_800ExtraBold,
+  });
 
   // The splash screen waits only for data already on the device (the saved session, this
-  // user's cached board, and the display font), never the network, so the app opens instantly
+  // user's cached board, and the fonts), never the network, so the app opens instantly
   // even offline.
   const appReady = !loading && (!session || ready) && (fontsLoaded || !!fontsError);
 
@@ -39,7 +52,8 @@ function RootStack() {
     <Stack
       screenOptions={{
         headerTintColor: Palette.primary,
-        headerTitleStyle: { fontFamily: FunFont.semiBold },
+        headerStyle: { backgroundColor: Brand.paper },
+        headerTitleStyle: { fontFamily: FunFont.extraBold, color: Brand.ink },
       }}>
       <Stack.Protected guard={!!session}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -56,15 +70,16 @@ function RootStack() {
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <AuthProvider>
-          <AppStateProvider>
-            <RootStack />
-          </AppStateProvider>
-        </AuthProvider>
+      <ThemeProvider value={NavigationTheme}>
+        <PreferencesProvider>
+          <AuthProvider>
+            <AppStateProvider>
+              <RootStack />
+            </AppStateProvider>
+          </AuthProvider>
+        </PreferencesProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );

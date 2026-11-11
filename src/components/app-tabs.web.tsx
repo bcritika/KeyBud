@@ -6,12 +6,14 @@ import {
   TabTriggerSlotProps,
   TabListProps,
 } from 'expo-router/ui';
-import { Pressable, View, StyleSheet } from 'react-native';
+import type { Ref } from 'react';
+import { Pressable, View, StyleSheet, type HostInstance } from 'react-native';
 
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-import { FunFont, MaxContentWidth, Palette, Spacing } from '@/constants/theme';
+import { Chunky, FunFont, MaxContentWidth, Palette, Spacing } from '@/constants/theme';
+import { useTouchTarget } from '@/hooks/use-touch-target';
 
 export default function AppTabs() {
   return (
@@ -34,19 +36,27 @@ export default function AppTabs() {
   );
 }
 
-export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps) {
+/** The current tab is a raised sun-yellow key with a heavier label; the others are flat text. */
+export function TabButton({ children, isFocused, ref, ...props }: TabTriggerSlotProps) {
+  const touchTarget = useTouchTarget();
   return (
-    <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
-      <ThemedView
-        type="backgroundElement"
-        style={[styles.tabButtonView, isFocused && styles.tabButtonViewFocused]}>
-        <ThemedText
-          type="small"
-          themeColor="textSecondary"
-          style={isFocused && styles.tabLabelFocused}>
-          {children}
-        </ThemedText>
-      </ThemedView>
+    <Pressable
+      {...props}
+      // expo-router still types this ref as the pre-0.88 View instance; at runtime it's the
+      // same host element Pressable expects.
+      ref={ref as Ref<HostInstance>}
+      style={({ pressed }) => [
+        styles.tabButton,
+        { minHeight: touchTarget },
+        isFocused && [Chunky.key, styles.tabButtonFocused],
+        pressed && isFocused && Chunky.pressed,
+      ]}>
+      <ThemedText
+        type="small"
+        themeColor={isFocused ? 'text' : 'textSecondary'}
+        style={isFocused && styles.tabLabelFocused}>
+        {children}
+      </ThemedText>
     </Pressable>
   );
 }
@@ -54,11 +64,8 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
 export function CustomTabList(props: TabListProps) {
   return (
     <View {...props} style={styles.tabListContainer}>
-      <ThemedView type="backgroundElement" style={styles.innerContainer}>
-        <ThemedText type="smallBold" style={styles.brandText}>
-          🔤 KeyBud
-        </ThemedText>
-
+      <ThemedView type="backgroundElement" style={[styles.innerContainer, Chunky.key]}>
+        <ThemedText style={styles.brandText}>KeyBud</ThemedText>
         {props.children}
       </ThemedView>
     </View>
@@ -76,7 +83,7 @@ const styles = StyleSheet.create({
   },
   innerContainer: {
     paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.five,
+    paddingHorizontal: Spacing.four,
     borderRadius: Spacing.five,
     flexDirection: 'row',
     alignItems: 'center',
@@ -86,20 +93,22 @@ const styles = StyleSheet.create({
   },
   brandText: {
     marginRight: 'auto',
+    fontFamily: FunFont.extraBold,
+    fontSize: 22,
+    lineHeight: 30,
   },
-  pressed: {
-    opacity: 0.7,
-  },
-  tabButtonView: {
-    paddingVertical: Spacing.one,
+  tabButton: {
     paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Chunky.key.borderRadius,
+    borderWidth: Chunky.key.borderWidth,
+    borderColor: 'transparent',
+    justifyContent: 'center',
   },
-  tabButtonViewFocused: {
-    backgroundColor: Palette.primarySoft,
+  tabButtonFocused: {
+    backgroundColor: Palette.highlight,
   },
   tabLabelFocused: {
-    color: Palette.primary,
-    fontFamily: FunFont.semiBold,
+    fontFamily: FunFont.extraBold,
+    fontSize: 16,
   },
 });
